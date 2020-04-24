@@ -18,6 +18,8 @@
 
 int bx;	//블록의 현재 x
 int by; //블록의 현재 y
+int b_type; //블록 종류를 저장 
+int b_rotation; //블록 회전값 저장 
 
 char key;
 void check_key(void);
@@ -25,15 +27,46 @@ void reset_map(void);
 void draw_map(void);
 void new_block(void);
 void move_block(int dir);
+int check_crush(int bx, int by, int b_rotation);
 
 int game_map[MAX_Y][MAX_X];
+int game_map_copy[MAX_Y][MAX_X];
 
-void gotoxy(int x, int y) { //gotoxy함수 
+int blocks[7][4][4][4] = {
+{{0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0},{0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0},
+{0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0},{0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0}},
+{{0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0},{0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0},
+ {0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0},{0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0}},
+{{0,0,0,0,1,1,0,0,0,1,1,0,0,0,0,0},{0,0,0,0,0,0,1,0,0,1,1,0,0,1,0,0},
+ {0,0,0,0,1,1,0,0,0,1,1,0,0,0,0,0},{0,0,0,0,0,0,1,0,0,1,1,0,0,1,0,0}},
+{{0,0,0,0,0,1,1,0,1,1,0,0,0,0,0,0},{0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0},
+ {0,0,0,0,0,1,1,0,1,1,0,0,0,0,0,0},{0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0}},
+{{0,0,0,0,0,0,1,0,1,1,1,0,0,0,0,0},{0,0,0,0,1,1,0,0,0,1,0,0,0,1,0,0},
+ {0,0,0,0,0,0,0,0,1,1,1,0,1,0,0,0},{0,0,0,0,0,1,0,0,0,1,0,0,0,1,1,0}},
+{{0,0,0,0,1,0,0,0,1,1,1,0,0,0,0,0},{0,0,0,0,0,1,0,0,0,1,0,0,1,1,0,0},
+ {0,0,0,0,0,0,0,0,1,1,1,0,0,0,1,0},{0,0,0,0,0,1,1,0,0,1,0,0,0,1,0,0}},
+{{0,0,0,0,0,1,0,0,1,1,1,0,0,0,0,0},{0,0,0,0,0,1,0,0,0,1,1,0,0,1,0,0},
+ {0,0,0,0,0,0,0,0,1,1,1,0,0,1,0,0},{0,0,0,0,0,1,0,0,1,1,0,0,0,1,0,0}}
+}; //블록모양 저장 4*4공간에 블록을 표현 blcoks[b_type][b_rotation][i][j]로 사용 
+
+
+void gotoxy(int x, int y) { //커서 이동 함수 
     COORD pos = { 2 * x,y };
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos);
 }
 
+void hidecursor()	//커서 숨기는 함수
+{
+	HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+	CONSOLE_CURSOR_INFO info;
+	info.dwSize = 1;
+	info.bVisible = FALSE;
+	SetConsoleCursorInfo(consoleHandle, &info);
+}
+
 int main(void) {
+	system("cls"); //화면을 지우고 
+	hidecursor();
 	reset_map();
 	new_block();
 	draw_map();
@@ -49,19 +82,27 @@ void check_key(void) {
 		switch (key)
 		{
 		case UP:
-			move_block(UP);
+			if (check_crush(bx, by, (b_rotation + 1) % 4) != 0) {
+				move_block(UP);
+			}
 			draw_map();
 			break;
 		case DOWN:
-			move_block(DOWN);
+			if (check_crush(bx, by + 1, b_rotation) != 0) {
+				move_block(DOWN);
+			}
 			draw_map();
 			break;
 		case LEFT:
-			move_block(LEFT);
+			if (check_crush(bx - 1, by, b_rotation)!=0) {
+				move_block(LEFT);
+			}
 			draw_map();
 			break;
 		case RIGHT:
-			move_block(RIGHT);
+			if (check_crush(bx + 1, by, b_rotation) != 0) {
+				move_block(RIGHT);
+			}
 			draw_map();
 			break;
 		case SPACEBAR:
@@ -96,21 +137,28 @@ void reset_map(void) {
 void draw_map(void) {
 	int i, j;
 
-	system("cls"); //화면을 지우고 
 	for (i = 0; i < MAX_Y; i++) {
 		for (j = 0; j < MAX_X; j++) {
-			gotoxy(j, i);
-			switch (game_map[i][j]) {
-			case EMPTY:
-				printf(" ");
-				break;
-			case WALL:
-				printf("▩");
-				break;
-			case BLOCK:
-				printf("■");
-				break;
+			if (game_map[i][j] != game_map_copy[i][j]) {
+				gotoxy(j, i);
+				switch (game_map[i][j]) {
+				case EMPTY:
+					printf(" ");
+					break;
+				case WALL:
+					printf("▩");
+					break;
+				case BLOCK:
+					printf("■");
+					break;
+				}
 			}
+		}
+	}
+
+	for (i = 0; i < MAX_Y; i++) {
+		for (j = 0; j < MAX_X; j++) {
+			game_map_copy[i][j] = game_map[i][j];
 		}
 	}
 }
@@ -121,11 +169,13 @@ void new_block(void) { //새로운 블록 생성
     bx = (MIN_X+MAX_X) / 2 - 1; //블록 생성 위치x좌표(게임판의 가운데) 
     by = (MIN_Y+MAX_Y) / 2 - 1;  //블록 생성위치 y좌표(제일 위) 
 
-	for (i = 0; i < 2; i++) {
-		for (j = 0; j < 2; j++) {
-			game_map[by + j][bx + i] = BLOCK;
-		}
-	}
+	b_type = 5;			//나중엔 임의 값으로 대체
+	b_rotation = 1;		//나중엔 임의 값으로 대체
+    for (i = 0;i < 4;i++) { //게임판 bx, by위치에 블럭생성  
+        for (j = 0;j < 4;j++) {
+            if (blocks[b_type][b_rotation][i][j] == 1) game_map[by + i][bx + j] = BLOCK;
+        }
+    }
 }
 
 void move_block(int dir) {
@@ -133,34 +183,84 @@ void move_block(int dir) {
 
 	switch (dir) {
 	case LEFT:
-		game_map[by][bx - 1] = BLOCK;
-		game_map[by + 1][bx - 1] = BLOCK;
-		game_map[by][bx + 1] = EMPTY;
-		game_map[by + 1][bx + 1] = EMPTY;
+		for (i = 0; i < 4; i++) {
+			for (j = 0; j < 4; j++) {
+				if (game_map[by + i][bx + j] != WALL) {
+					game_map[by + i][bx + j] = EMPTY;
+				}
+			}
+		}
 		bx--;
+		for (i = 0; i < 4; i++) {
+			for (j = 0; j < 4; j++) {
+				if (blocks[b_type][b_rotation][i][j] == 1) {
+					game_map[by + i][bx + j] = BLOCK;
+				}
+			}
+		}
 		break;
 	case RIGHT:
-		game_map[by][bx + 2] = BLOCK;
-		game_map[by + 1][bx + 2] = BLOCK;
-		game_map[by][bx] = EMPTY;
-		game_map[by + 1][bx] = EMPTY;
+		for (i = 0; i < 4; i++) {
+			for (j = 0; j < 4; j++) {
+				if (game_map[by + i][bx + j] != WALL) {
+					game_map[by + i][bx + j] = EMPTY;
+				}
+			}
+		}
 		bx++;
+		for (i = 0; i < 4; i++) {
+			for (j = 0; j < 4; j++) {
+				if (blocks[b_type][b_rotation][i][j] == 1) {
+					game_map[by + i][bx + j] = BLOCK;
+				}
+			}
+		}
 		break;
 	case UP:
-		game_map[by - 1][bx] = BLOCK;
-		game_map[by - 1][bx + 1] = BLOCK;
-		game_map[by + 1][bx] = EMPTY;
-		game_map[by + 1][bx + 1] = EMPTY;
-		by--;
+		for (i = 0; i < 4; i++) {
+			for (j = 0; j < 4; j++) {
+				if (game_map[by + i][bx + j] != WALL) {
+					game_map[by + i][bx + j] = EMPTY;
+				}
+			}
+		}
+		b_rotation = (b_rotation + 1) % 4;
+		for (i = 0; i < 4; i++) {
+			for (j = 0; j < 4; j++) {
+				if (blocks[b_type][b_rotation][i][j] == 1) {
+					game_map[by + i][bx + j] = BLOCK;
+				}
+			}
+		}
 		break;
 	case DOWN:
-		game_map[by + 2][bx] = BLOCK;
-		game_map[by + 2][bx + 1] = BLOCK;
-		game_map[by][bx] = EMPTY;
-		game_map[by][bx + 1] = EMPTY;
+		for (i = 0; i < 4; i++) {
+			for (j = 0; j < 4; j++) {
+				if (game_map[by + i][bx + j] != WALL) {
+					game_map[by + i][bx + j] = EMPTY;
+				}
+			}
+		}
 		by++;
+		for (i = 0; i < 4; i++) {
+			for (j = 0; j < 4; j++) {
+				if (blocks[b_type][b_rotation][i][j] == 1) {
+					game_map[by + i][bx + j] = BLOCK;
+				}
+			}
+		}
 		break;
-
-
 	}
+}
+
+int check_crush(int bx, int by, int b_rotation) { //지정된 좌표와 회전값으로 충돌이 있는지 검사 
+    int i, j;
+
+    for (i = 0;i < 4;i++) {
+        for (j = 0;j < 4;j++) { //지정된 위치의 게임판과 블럭모양을 비교해서 겹치면 false를 리턴 
+			//if (blocks[b_type][b_rotation][i][j] == 1 && game_map[by + i][bx + j] != EMPTY) return 0;
+			if (blocks[b_type][b_rotation][i][j] == 1 && game_map[by + i][bx + j] == WALL) return 0;
+		}
+    }
+    return 1; //하나도 안겹치면 true리턴 
 }
